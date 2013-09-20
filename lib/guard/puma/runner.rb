@@ -34,19 +34,21 @@ module Guard
     # override the usual start method otherwise puma gets launched inside guard
     def start
       unless puma_running?
-        run(:halt)
-        system %{sh -c 'cd %s && puma %s &'} % [Dir.pwd, puma_args.join(" ")]
+        @options[:pid] = spawn(['puma'].concat(puma_args).join(' '), chdir: Dir.pwd)
+        Process.detach(@options[:pid])
       end
       true
     end
 
     def halt
-      run(:halt)
+      run('halt')
+      prepare_configuration
+      send_signal('halt') unless @message == "Command halt sent success"
     end
 
     def restart
       if puma_running?
-        run(:'phased-restart')
+        run('phased-restart')
       else
         start
       end
@@ -96,8 +98,8 @@ module Guard
     # this is a nasty hack :(
     private
     def puma_running?
-      run(:status)
-      return @message == "Puma is running"
+      run('status')
+      return ["Puma is running","Puma is started"].include?(@message)
     end
 
     private
